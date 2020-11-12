@@ -1,0 +1,71 @@
+import pandas as pd
+import numpy as np
+
+#importing files 
+tsv_file = "title.akas.tsv"
+
+with open(tsv_file, "r") as f:
+    output = f.read()
+df = pd.read_table(tsv_file, sep="\t")   
+df.head(2)    
+f.close()
+imdb = pd.read_csv('imdb2.csv')
+tmdb = pd.read_csv('tmdb2.csv')
+money = pd.read_csv("tn.movie_budgets.csv")
+
+
+#Drop null values in region column
+df1 = df.dropna(axis=0,subset=['region'])
+df1.dropna(axis=0,inplace=True)
+
+#Rename column to making merging dataframes easier
+imdb = imdb.rename(columns = {'tconst':'titleId'})
+
+new_df2 = pd.merge(imdb,df1, on="titleId",how="left")
+#Only keep rows where region is equal to "US"
+new_df3 = new_df2[new_df2['region'] =="US"]
+
+#name change
+imdb2 = new_df3
+
+#Cleaning up by dropping columns
+imdb3 = imdb2.drop(["types","attributes","isOriginalTitle"],axis=1)
+
+#Checking to see if both title columns contain the same info... they don't
+imdb3['primary_title'].equals(imdb3['title'])
+
+#Creating new column to display where two title columns don't match
+imdb3['movie_title'] = np.where(imdb3['primary_title'] == imdb3['title'], imdb3['title'],"different")
+
+#rows where "primary_title" and "title" do not match
+imdb3.loc[imdb3['movie_title']=="different"]
+
+#dropping new column and "primary_title column" so that one title column remains
+imdb3.drop(['primary_title','movie_title'], axis=1, inplace=True)
+
+#Cleaning up by dropping columns
+tmdb.drop(['Unnamed: 0'], axis=1, inplace=True)
+
+#creating new column to see if two title columns match... they do not
+tmdb['movie_title'] = np.where(tmdb['original_title'] == tmdb['title'], tmdb['title'],"different")
+
+#dropping two title columns so that one remains
+tmdb.drop(['original_title','movie_title'], axis=1, inplace=True)
+
+#merging imdb3 and tmdb files
+merge_test = pd.merge(imdb3,tmdb, on="title",how="right")
+
+#removing language columns - not needed
+merge_test.drop(['original_language','language'], axis=1, inplace=True)
+
+#filling null "genre" values to see if I can pull in the genres based on "genre_id" column
+merge_test["genres"].fillna("no genre", inplace = True) 
+
+#Cleaning up money file
+#renaming column to make merging simpler
+money.rename(columns = {'movie': 'title'}, inplace = True)
+
+#merging money file with other two files
+all_dfs = pd.merge(merge_test, money, on="title",how="left")
+
+
